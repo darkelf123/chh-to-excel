@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         CHH摸鱼助手(excel)
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  把 Chiphell 论坛伪装成 Excel 表格。公式栏变成可点击的层级目录，底部 Sheet 实现翻页。
 // @author       Gemini (ported from S1摸鱼助手 by Gemini)
-// @match        *://www.chiphell.com/forum-*
-// @match        *://www.chiphell.com/thread-*
-// @match        *://www.chiphell.com/forum.php
+// @match        *://www.chiphell.com/forum*
+// @match        *://www.chiphell.com/thread*
+//   上面两条覆盖:
+//     - 伪静态 URL: forum-146-1.html / thread-2670385-1-1.html
+//     - 动态 URL:   forum.php?mod=viewthread&tid=xxx&page=N  (翻页关键!)
 // @grant        GM_addStyle
 // @run-at       document-end
 // @license MIT
@@ -315,6 +317,11 @@
              e.preventDefault();
              toggleMode();
         }
+        // Ctrl+Shift+R 手动重新伪装 (AJAX 翻页/快速回复后兜底)
+        if (e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'R') {
+             e.preventDefault();
+             if (isWorkMode) reapplyExcel();
+        }
     });
 
     if (isWorkMode) {
@@ -338,6 +345,7 @@
         initSheetPagination();
         updateFormulaBar();
         initImageHider();
+        setupMutationObserver();
     }
 
     function disableExcel() {
@@ -519,4 +527,44 @@
             btn.classList.remove('all-shown');
         }
     }
+
+    // ==========================================
+    // 5. 翻页 / AJAX 兼容 (双保险)
+    //    - MutationObserver: AJAX 翻页/快速回复后, 新楼层自动伪装
+    //    - Ctrl+Shift+R:    手动触发重伪装
+    //    - popstate:        pushState 翻页兜底
+    // ==========================================
+    let excelObserver = null;
+    let excelDebounceTimer = null;
+
+    function setupMutationObserver() {
+        // 只观察内容容器, 不观察整个 body (性能 + 防循环)
+        const targets = ['#postlist', '#threadlisttableid'];
+
+        targets.forEach(sel => {
+            const el = document.querySelector(sel);
+            if (!el) return;
+
+            if (!excelObserver) {
+                excelObserver = new MutationObserver(() => {
+                    if (excelDebounceTimer) clearTimeout(excelDebounceTimer);
+                    excelDebounceTimer = setTimeout(() => {
+                        if (isWorkMode) reapplyExcel();
+                    }, 100);
+                });
+            }
+            excelObserver.observe(el, { childList: true, subtree: true });
+        });
+    }
+
+    // 只重新做幂等的事 (initBreadcrumb/initSheetPagination/updateFormulaBar 不重跑, 避免重复注册事件)
+    function reapplyExcel() {
+        forceLinksToSelf();   // 幂等: 修新插入链接的 target
+        initImageHider();     // 幂等: 用 data-hld-injected 防重, 自动跳过已处理图片
+    }
+
+    // pushState 翻页兜底 (部分 Discuz! 模板用 history.pushState 模拟翻页)
+    window.addEventListener('popstate', () => {
+        if (isWorkMode) setTimeout(reapplyExcel, 200);
+    });
 })();
