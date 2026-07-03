@@ -2,7 +2,7 @@
 
 > 把 [Chiphell](https://www.chiphell.com/) 论坛伪装成 Excel 表格。上班摸鱼，老板路过看不出来。
 
-![版本](https://img.shields.io/badge/version-1.0-green)
+![版本](https://img.shields.io/badge/version-1.1-green)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Tampermonkey](https://img.shields.io/badge/Tampermonkey-required-orange)
 
